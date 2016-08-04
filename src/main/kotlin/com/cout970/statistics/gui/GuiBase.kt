@@ -2,6 +2,7 @@ package com.cout970.statistics.gui
 
 import net.minecraft.client.gui.inventory.GuiContainer
 import net.minecraft.client.renderer.GlStateManager
+import net.minecraft.client.renderer.RenderHelper
 import net.minecraft.client.renderer.Tessellator
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats
 import net.minecraft.item.ItemStack
@@ -18,7 +19,12 @@ abstract class GuiBase(val container: ContainerBase) : GuiContainer(container) {
     }
 
     fun drawStack(stack: ItemStack, x: Int, y: Int) {
+        GlStateManager.enableRescaleNormal()
+        RenderHelper.enableGUIStandardItemLighting()
         mc.renderItem.renderItemIntoGUI(stack, x, y)
+        mc.renderItem.renderItemOverlayIntoGUI(fontRendererObj, stack, x, y, null)
+        RenderHelper.disableStandardItemLighting()
+        GlStateManager.disableRescaleNormal()
     }
 
     fun drawLine(points: List<Pair<Float, Float>>) {
