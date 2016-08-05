@@ -2,7 +2,6 @@ package com.cout970.statistics.tileentity
 
 import com.cout970.statistics.block.BlockCable
 import com.cout970.statistics.block.BlockController
-import net.minecraft.item.Item
 import net.minecraft.item.ItemStack
 import net.minecraft.util.EnumFacing
 import net.minecraft.util.ITickable
@@ -16,14 +15,28 @@ import java.util.*
  */
 class TileController : TileBase(), ITickable {
 
-    val snapshots = LinkedList<DataSnapshot>()
+    val shortSnapshots = LinkedList<DataSnapshot>()
+    val mediumSnapshots = LinkedList<DataSnapshot>()
+    val largeSnapshots = LinkedList<DataSnapshot>()
 
     override fun update() {
         if (worldObj.isRemote) return
         if ((worldObj.totalWorldTime + pos.hashCode()) % 20 == 0L) {
-            snapshots.addFirst(DataSnapshot().apply { collectData(getStacks()) })
-            if (snapshots.size > 50) {
-                snapshots.removeLast()
+            shortSnapshots.addFirst(DataSnapshot().apply { collectData(getStacks()) })
+            if (shortSnapshots.size > 50) {
+                shortSnapshots.removeLast()
+            }
+        }
+        if ((worldObj.totalWorldTime + pos.hashCode()) % 200 == 0L) {
+            mediumSnapshots.addFirst(DataSnapshot().apply { collectData(getStacks()) })
+            if (mediumSnapshots.size > 50) {
+                mediumSnapshots.removeLast()
+            }
+        }
+        if ((worldObj.totalWorldTime + pos.hashCode()) % (20 * 60) == 0L) {
+            largeSnapshots.addFirst(DataSnapshot().apply { collectData(getStacks()) })
+            if (largeSnapshots.size > 50) {
+                largeSnapshots.removeLast()
             }
         }
     }
@@ -77,32 +90,29 @@ class TileController : TileBase(), ITickable {
     }
 
     class ItemIdentifier(
-            val item: Item,
-            val metadata: Int
+           val stack: ItemStack
     ) {
 
 
-        override fun equals(other: Any?): Boolean {
+
+        override fun toString(): String{
+            return "ItemIdentifier(stack=$stack)"
+        }
+
+        override fun equals(other: Any?): Boolean{
             if (this === other) return true
             if (other !is ItemIdentifier) return false
 
-            if (item != other.item) return false
-            if (metadata != other.metadata) return false
+            if (stack.item != other.stack.item) return false
+            if (stack.metadata != other.stack.metadata) return false
+            if (stack.tagCompound != other.stack.tagCompound) return false
 
             return true
         }
 
-        override fun hashCode(): Int {
-            var result = item.hashCode()
-            result = 31 * result + metadata
-            return result
+        override fun hashCode(): Int{
+            return ((stack.tagCompound?.hashCode() ?: 0)  * 31 + stack.item.hashCode()) * 31 + stack.metadata
         }
-
-        override fun toString(): String {
-            return "ItemId(item=${item.unlocalizedName}, metadata=$metadata)"
-        }
-
-        fun toStack(): ItemStack = ItemStack(item, 1, metadata)
     }
 
     class ItemStatistics(
@@ -134,4 +144,4 @@ class TileController : TileBase(), ITickable {
     }
 }
 
-val ItemStack.identifier: TileController.ItemIdentifier get() = TileController.ItemIdentifier(this.item, this.metadata)
+val ItemStack.identifier: TileController.ItemIdentifier get() = TileController.ItemIdentifier(this)

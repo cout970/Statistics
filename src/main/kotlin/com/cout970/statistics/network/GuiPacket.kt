@@ -3,6 +3,8 @@ package com.cout970.statistics.network
 import com.cout970.statistics.gui.ContainerBase
 import io.netty.buffer.ByteBuf
 import net.minecraft.client.Minecraft
+import net.minecraft.nbt.NBTTagCompound
+import net.minecraft.network.PacketBuffer
 import net.minecraftforge.fml.common.network.simpleimpl.IMessage
 import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext
@@ -13,19 +15,18 @@ import net.minecraftforge.fml.common.network.simpleimpl.MessageContext
 //Server -> client
 class GuiPacket() : IMessage {
 
-    var data: IndexedData? = null
+    var nbt: NBTTagCompound? = null
 
-    constructor(data: IndexedData) : this() {
-        this.data = data
+    constructor(data: NBTTagCompound) : this() {
+        this.nbt = data
     }
 
     override fun fromBytes(buf: ByteBuf) {
-        data = IndexedData()
-        data!!.fromBytes(buf)
+        nbt = PacketBuffer(buf).readNBTTagCompoundFromBuffer()
     }
 
     override fun toBytes(buf: ByteBuf) {
-        data!!.toBytes(buf)
+        PacketBuffer(buf).writeNBTTagCompoundToBuffer(nbt)
     }
 
     companion object : IMessageHandler<GuiPacket, IMessage> {
