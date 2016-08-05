@@ -4,6 +4,7 @@ import com.cout970.statistics.Statistics
 import com.cout970.statistics.block.BlockCable
 import com.cout970.statistics.block.BlockController
 import com.cout970.statistics.block.BlockInventoryConnector
+import com.cout970.statistics.block.BlockInventoryDetector
 import net.minecraft.client.renderer.block.model.ModelResourceLocation
 import wiresegal.zenmodelloader.client.core.ModelHandler
 import java.util.*
@@ -14,7 +15,8 @@ import java.util.*
 val blocks = listOf(
         BlockCable,
         BlockController,
-        BlockInventoryConnector
+        BlockInventoryConnector,
+        BlockInventoryDetector
 )
 
 fun registerBlocks() {

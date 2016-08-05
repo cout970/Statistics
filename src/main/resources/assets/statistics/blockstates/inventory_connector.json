@@ -3,7 +3,7 @@
     "defaults": {
         "model": "cube_all",
         "textures": {
-            "all": "statistics:block/cable"
+            "all": "statistics:block/inventory_connector"
         }
     },
     "variants": {
