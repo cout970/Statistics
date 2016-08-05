@@ -1,147 +1,157 @@
 package com.cout970.statistics.tileentity
 
-import com.cout970.statistics.block.BlockCable
-import com.cout970.statistics.block.BlockController
+import com.cout970.statistics.data.ItemIdentifier
+import com.cout970.statistics.data.ItemStatistics
+import com.cout970.statistics.data.identifier
+import com.cout970.statistics.gui.forEach
 import net.minecraft.item.ItemStack
-import net.minecraft.util.EnumFacing
+import net.minecraft.nbt.NBTTagCompound
+import net.minecraft.nbt.NBTTagList
 import net.minecraft.util.ITickable
-import net.minecraft.util.math.BlockPos
-import net.minecraftforge.items.CapabilityItemHandler
-import net.minecraftforge.items.IItemHandler
-import java.util.*
+import net.minecraftforge.common.util.Constants
 
 /**
  * Created by cout970 on 04/08/2016.
  */
 class TileController : TileBase(), ITickable {
 
-    val shortSnapshots = LinkedList<DataSnapshot>()
-    val mediumSnapshots = LinkedList<DataSnapshot>()
-    val largeSnapshots = LinkedList<DataSnapshot>()
+    var type = 0
+
+    val selected = IntArray(15, { it })
+    val dataArray = mutableMapOf<Int, MutableList<Int>>()
+    val items = mutableSetOf<ItemIdentifier>()
+
+    var pointer = 0
+
+    //server
+    val shortUpdates = mutableMapOf<ItemIdentifier, ItemStatistics>()
+    val mediumUpdates = mutableMapOf<ItemIdentifier, ItemStatistics>()
+    val largeUpdates = mutableMapOf<ItemIdentifier, ItemStatistics>()
+
+    override fun receiveMsg(id: Int, value: Int) {
+        if (id == -1) {
+            type = value
+        } else {
+            selected[id] = value
+        }
+    }
 
     override fun update() {
         if (worldObj.isRemote) return
         if ((worldObj.totalWorldTime + pos.hashCode()) % 20 == 0L) {
-            shortSnapshots.addFirst(DataSnapshot().apply { collectData(getStacks()) })
-            if (shortSnapshots.size > 50) {
-                shortSnapshots.removeLast()
-            }
-        }
-        if ((worldObj.totalWorldTime + pos.hashCode()) % 200 == 0L) {
-            mediumSnapshots.addFirst(DataSnapshot().apply { collectData(getStacks()) })
-            if (mediumSnapshots.size > 50) {
-                mediumSnapshots.removeLast()
-            }
-        }
-        if ((worldObj.totalWorldTime + pos.hashCode()) % (20 * 60) == 0L) {
-            largeSnapshots.addFirst(DataSnapshot().apply { collectData(getStacks()) })
-            if (largeSnapshots.size > 50) {
-                largeSnapshots.removeLast()
-            }
-        }
-    }
-
-    fun getStacks(): List<ItemStack> {
-        val invs = getInventories()
-        val items = mutableListOf<ItemStack>()
-        for (i in invs) {
-            for (j in 0 until i.slots) {
-                val item = i.getStackInSlot(j)
-                if (item != null) {
-                    items.add(item)
+            val stacks = getStacks()
+            collectData(shortUpdates, stacks)
+            if ((worldObj.totalWorldTime + pos.hashCode()) % 200 == 0L) {
+                collectData(mediumUpdates, stacks)
+                if ((worldObj.totalWorldTime + pos.hashCode()) % 1200 == 0L) {
+                    collectData(largeUpdates, stacks)
                 }
             }
         }
-        return items
     }
 
-    fun getInventories(): List<IItemHandler> {
-        val list = mutableListOf<IItemHandler>()
-        val queue = LinkedList<Pair<BlockPos, EnumFacing>>()
-        val map = HashSet<Pair<BlockPos, EnumFacing>>()
-        for (dir in EnumFacing.VALUES) {
-            queue.add(pos to dir)
-            map.add(pos to dir)
+    fun collectData(map: MutableMap<ItemIdentifier, ItemStatistics>, stacks: List<ItemStack>) {
+
+        val processed = mutableMapOf<ItemIdentifier, Int>()
+        for (s in stacks) {
+            val id = s.identifier
+            if (id in processed) {
+                processed[id] = processed[id]!! + s.stackSize
+            } else {
+                processed.put(id, s.stackSize)
+            }
         }
 
-        while (!queue.isEmpty()) {
-            val pair = queue.pop()
-            val pos = pair.first.offset(pair.second)
-            val block = worldObj.getBlockState(pos).block
-            if (block == BlockCable || block == BlockController) {
-                for (dir in EnumFacing.VALUES) {
-                    if ((pos to dir) !in map) {
-                        queue.add(pos to dir)
-                        map.add(pos to dir)
-                    }
+        val allIds = processed.keys + map.keys
+        for (id in allIds) {
+            val inM = id in map
+            val inP = id in processed
+            if (inM && !inP) {
+                map[id]!!.stackSize.addFirst(0)
+                if (map[id]!!.stackSize.size > 50) {
+                    map[id]!!.stackSize.removeLast()
+                }
+            } else if (!inM && inP) {
+                val stat = ItemStatistics()
+                stat.stackSize.addFirst(processed[id])
+                map.put(id, stat)
+            } else if (inM && inP) {
+                map[id]!!.stackSize.addFirst(processed[id])
+                if (map[id]!!.stackSize.size > 50) {
+                    map[id]!!.stackSize.removeLast()
                 }
             } else {
-                val tile = worldObj.getTileEntity(pos)
-                if (tile != null) {
-                    val inventory = tile.getCapability(CapabilityItemHandler.ITEM_HANDLER_CAPABILITY, pair.second.opposite)
-                    if (inventory != null) {
-                        list.add(inventory)
-                    }
-                }
+                throw IllegalStateException("Math is broken, this should never happen")
             }
         }
-
-        return list
     }
 
-    class ItemIdentifier(
-           val stack: ItemStack
-    ) {
+    override fun readFromNBT(compound: NBTTagCompound?) {
+        super.readFromNBT(compound)
+        val data = compound!!
+        type = data.getInteger("Type")
 
-
-
-        override fun toString(): String{
-            return "ItemIdentifier(stack=$stack)"
+        val short = data.getTagList("short", Constants.NBT.TAG_COMPOUND)
+        val shortTemp = mutableMapOf<ItemIdentifier, ItemStatistics>()
+        short.forEach {
+            val id = ItemIdentifier.deserializeNBT(it.getCompoundTag("ID"))
+            val stacksize = it.getIntArray("stacksize")
+            shortTemp.put(id, ItemStatistics(stacksize))
         }
+        shortUpdates.clear()
+        shortUpdates.putAll(shortTemp)
 
-        override fun equals(other: Any?): Boolean{
-            if (this === other) return true
-            if (other !is ItemIdentifier) return false
-
-            if (stack.item != other.stack.item) return false
-            if (stack.metadata != other.stack.metadata) return false
-            if (stack.tagCompound != other.stack.tagCompound) return false
-
-            return true
+        val medium = data.getTagList("medium", Constants.NBT.TAG_COMPOUND)
+        val mediumTemp = mutableMapOf<ItemIdentifier, ItemStatistics>()
+        medium.forEach {
+            val id = ItemIdentifier.deserializeNBT(it.getCompoundTag("ID"))
+            val stacksize = it.getIntArray("stacksize")
+            mediumTemp.put(id, ItemStatistics(stacksize))
         }
+        mediumUpdates.clear()
+        mediumUpdates.putAll(mediumTemp)
 
-        override fun hashCode(): Int{
-            return ((stack.tagCompound?.hashCode() ?: 0)  * 31 + stack.item.hashCode()) * 31 + stack.metadata
+        val large = data.getTagList("large", Constants.NBT.TAG_COMPOUND)
+        val largeTemp = mutableMapOf<ItemIdentifier, ItemStatistics>()
+        large.forEach {
+            val id = ItemIdentifier.deserializeNBT(it.getCompoundTag("ID"))
+            val stacksize = it.getIntArray("stacksize")
+            largeTemp.put(id, ItemStatistics(stacksize))
         }
+        largeUpdates.clear()
+        largeUpdates.putAll(largeTemp)
     }
 
-    class ItemStatistics(
-            val itemId: ItemIdentifier
-    ) {
-        var amount = 0
-        override fun toString(): String {
-            return "ItemStatistics(itemId=$itemId, amount=$amount)"
-        }
-    }
+    override fun writeToNBT(compound: NBTTagCompound?): NBTTagCompound {
+        val data = compound!!
+        data.setInteger("Type", type)
 
-    class DataSnapshot() {
-        val data = mutableMapOf<ItemIdentifier, ItemStatistics>()
-
-        fun collectData(stacks: List<ItemStack>) {
-            data.clear()
-            for (i in stacks) {
-                val id = i.identifier
-                if (id in data) {
-                    val sta = data[id]
-                    sta?.run { amount += i.stackSize }
-                } else {
-                    val sta = ItemStatistics(id)
-                    sta.amount = i.stackSize
-                    data.put(id, sta)
-                }
-            }
+        val short = NBTTagList()
+        for ((key, value) in shortUpdates) {
+            val nbt = NBTTagCompound()
+            nbt.setTag("ID", key.serializeNBT())
+            nbt.setIntArray("stacksize", value.stackSize.toIntArray())
+            short.appendTag(nbt)
         }
+        data.setTag("short", short)
+
+        val medium = NBTTagList()
+        for ((key, value) in mediumUpdates) {
+            val nbt = NBTTagCompound()
+            nbt.setTag("ID", key.serializeNBT())
+            nbt.setIntArray("stacksize", value.stackSize.toIntArray())
+            medium.appendTag(nbt)
+        }
+        data.setTag("medium", medium)
+
+        val large = NBTTagList()
+        for ((key, value) in largeUpdates) {
+            val nbt = NBTTagCompound()
+            nbt.setTag("ID", key.serializeNBT())
+            nbt.setIntArray("stacksize", value.stackSize.toIntArray())
+            large.appendTag(nbt)
+        }
+        data.setTag("large", large)
+        return super.writeToNBT(compound)
     }
 }
-
-val ItemStack.identifier: TileController.ItemIdentifier get() = TileController.ItemIdentifier(this)

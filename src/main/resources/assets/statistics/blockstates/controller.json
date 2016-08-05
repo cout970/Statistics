@@ -1,0 +1,27 @@
+{
+    "forge_marker": 1,
+    "defaults": {
+        "model": "cube",
+        "textures": {
+            "up": "statistics:block/controller",
+            "down": "statistics:block/controller",
+            "north": "statistics:block/controller_front",
+            "south": "statistics:block/controller",
+            "west": "statistics:block/controller",
+            "east": "statistics:block/controller"
+        }
+    },
+    "variants": {
+        "facing": {
+            "north": { "y": 0 },
+            "south": { "y": 180 },
+            "west": { "y": 90 },
+            "east": { "y": 270 }
+        },
+        "inventory": [
+            {
+                "transform": "forge:default-block"
+            }
+        ]
+    }
+}

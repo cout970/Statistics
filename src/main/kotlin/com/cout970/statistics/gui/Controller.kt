@@ -1,8 +1,12 @@
 package com.cout970.statistics.gui
 
 import com.cout970.statistics.Statistics
+import com.cout970.statistics.data.ItemIdentifier
+import com.cout970.statistics.data.ItemStatistics
+import com.cout970.statistics.network.ClientEventPacket
 import com.cout970.statistics.network.GuiPacket
 import com.cout970.statistics.tileentity.TileController
+import com.cout970.statistics.util.orElse
 import net.minecraft.client.gui.Gui
 import net.minecraft.client.renderer.GlStateManager
 import net.minecraft.entity.player.EntityPlayer
@@ -12,7 +16,6 @@ import net.minecraft.item.Item
 import net.minecraft.item.ItemStack
 import net.minecraft.nbt.NBTTagCompound
 import net.minecraft.nbt.NBTTagList
-import net.minecraft.util.ResourceLocation
 import net.minecraft.util.math.BlockPos
 import net.minecraft.world.World
 import net.minecraftforge.common.util.Constants
@@ -25,12 +28,8 @@ import java.awt.Color
  * Created by cout970 on 04/08/2016.
  */
 
-val CONTROLLER_BACKGROUND = ResourceLocation(Statistics.MOD_ID, "textures/gui/controller.png")
-
 class GuiController(val controller: ContainerController) : GuiBase(controller) {
 
-    val selected = IntArray(15, { it })
-    var pointer = 0
     var offset = 0
     var count = 0
 
@@ -54,62 +53,62 @@ class GuiController(val controller: ContainerController) : GuiBase(controller) {
 
         Gui.drawRect(guiLeft + 4, guiTop + 123, guiLeft + 276, guiTop + 125 + 54, 0x4F4C4C4C.toInt())
         var topValue: Int = 64
+        val tile = controller.tileEntity!!
 
         synchronized(controller.tileEntity as TileController) {
 
-            val snapshots = controller.tileEntity!!.shortSnapshots
-            val datas = snapshots.map { it.data.entries }.flatten().groupBy { it.key }
-            if (datas.values.isEmpty()) return@synchronized
+            if (tile.items.isEmpty()) return@synchronized
+            val itemMap = mutableMapOf<Int, ItemIdentifier>()
+            val allItems = tile.items.sortedBy { it.stack.item.registryName.toString() }
+            allItems.forEachIndexed { i, id -> if (i in tile.selected) itemMap.put(i, id) }
+
+            for (index in itemMap.keys) {
+                if (index !in tile.dataArray) {
+                    tile.dataArray.put(index, mutableListOf<Int>())
+                } else if (tile.dataArray[index] == null) {
+                    tile.dataArray.put(index, mutableListOf<Int>())
+                }
+            }
 
             var max = 64
-            var tempIndex = 0
-            for ((key) in datas) {
-                if (tempIndex in selected) {
-                    max = Math.max(max, datas[key]!!.maxBy { it.value.amount }!!.value.amount)
-                }
-                tempIndex++
+            for (index in itemMap.keys) {
+                max = Math.max(max, tile.dataArray[index]!!.maxBy { it }.orElse(0))
             }
 
             topValue = (Math.ceil(max / 64.0) * 64).toInt()
             val scale = 120f / topValue.toFloat()
 
-            var pos = 0
-            var index = 0
+            for (index in itemMap.keys) {
 
-            for ((key) in datas) {
-
-                if (index in selected) {
-
-                    //draw line
-                    val points = mutableListOf<Pair<Float, Float>>()
-                    for (i in 0 until 50) {
-                        val value: Float
-                        if (snapshots.size > 49 - i) {
-                            val stat = snapshots[49 - i].data.getOrElse(key, { null })
-                            if (stat != null) {
-                                value = Math.min(stat.amount.toFloat() * scale, 120.0f)
-                            } else {
-                                value = 0.0f
-                            }
-                        } else {
-                            value = 0.0f
-                        }
-                        points.add(Pair(i.toFloat() * 279f / 49f + guiLeft + 1, guiTop + 121 - value))
+                //draw line
+                val points = mutableListOf<Pair<Float, Float>>()
+                for (i in 0 until 50) {
+                    val value: Float
+                    if (tile.dataArray[index]!!.size > 49 - i) {
+                        val stat = tile.dataArray[index]!![49 - i]
+                        value = Math.min(stat * scale, 120.0f)
+                    } else {
+                        value = 0.0f
                     }
-
-                    val dye = EnumDyeColor.byMetadata(selected.indexOf(index) % 16)
-                    val color = Color(dye.mapColor.colorValue)
-                    GlStateManager.color(color.red / 256f, color.green / 256f, color.blue / 256f)
-                    GL11.glLineWidth(1.5f)
-                    drawLine(points)
+                    points.add(Pair(i.toFloat() * 279f / 49f + guiLeft + 1, guiTop + 121 - value))
                 }
+
+                val dye = EnumDyeColor.byMetadata(tile.selected.indexOf(index) % 16)
+                val color = Color(dye.mapColor.colorValue)
+                GlStateManager.color(color.red / 256f, color.green / 256f, color.blue / 256f)
+                GL11.glLineWidth(1.5f)
+                drawLine(points)
+            }
+
+            var index = 0
+            for (i in allItems) {
                 if (index / 15 < 3 + offset && index / 15 - offset >= 0) {
-                    val dye = EnumDyeColor.byMetadata(selected.indexOf(index) % 16)
+                    val dye = EnumDyeColor.byMetadata(tile.selected.indexOf(index) % 16)
                     val x = index % 15 * 18 + 6
                     val y = (index / 15 - offset) * 18 + 125
-                    val stack = key.stack.copy().apply { stackSize = 1 }
+                    val stack = i.stack.copy().apply { stackSize = 1 }
 
-                    if (index in selected) {
+                    if (index in tile.selected) {
                         if (stack.item != Item.getItemFromBlock(Blocks.STAINED_GLASS_PANE)) {
                             GlStateManager.pushMatrix()
                             GlStateManager.translate(0.0, 0.0, -20.0)
@@ -126,10 +125,22 @@ class GuiController(val controller: ContainerController) : GuiBase(controller) {
             count = index
         }
 
+        val s = 0.5f
+
+        GlStateManager.pushMatrix()
+        GlStateManager.translate(guiLeft.toDouble(), guiTop.toDouble() + 130, 0.0)
+        GlStateManager.scale(s, s, s)
+        val text = when (tile.type) {
+            0 -> "1 sec"
+            1 -> "10 sec"
+            else -> "1 min"
+        }
+        drawRightString(text, 0, 0)
+        GlStateManager.popMatrix()
+
         val top = guiTop.toDouble() - 1
         val bottom = guiTop + 120.0 - 1
 
-        val s = 0.5f
         val max = 16
         for (i in 0..max) {
             GlStateManager.pushMatrix()
@@ -174,30 +185,44 @@ class GuiController(val controller: ContainerController) : GuiBase(controller) {
                 offset--
             }
         } else if (keyCode == Keyboard.KEY_BACK) {
-            selected.fill(-1)
+            controller.tileEntity!!.selected.fill(-1)
+        } else if (keyCode == Keyboard.KEY_1) {
+
+            Statistics.NETWORK.sendToServer(ClientEventPacket(controller.tileEntity!!.world.provider.dimension,
+                    controller.tileEntity!!.pos, -1, 0))
+        } else if (keyCode == Keyboard.KEY_2) {
+
+            Statistics.NETWORK.sendToServer(ClientEventPacket(controller.tileEntity!!.world.provider.dimension,
+                    controller.tileEntity!!.pos, -1, 1))
+        } else if (keyCode == Keyboard.KEY_3) {
+
+            Statistics.NETWORK.sendToServer(ClientEventPacket(controller.tileEntity!!.world.provider.dimension,
+                    controller.tileEntity!!.pos, -1, 2))
         }
         super.keyTyped(typedChar, keyCode)
     }
 
     override fun mouseClicked(mouseX: Int, mouseY: Int, mouseButton: Int) {
+        val tile = controller.tileEntity!!
         start@for (x in 0 until 15) {
             for (y in 0 until 3) {
                 if (inside(guiLeft + x * 18 + 6, guiTop + y * 18 + 125, 18, 18, mouseX, mouseY)) {
                     val index = x + (y + offset) * 15
                     if (mouseButton == 0) {
-                        if (index !in selected) {
-                            val indexOf = selected.indexOf(-1)
+                        if (index !in tile.selected) {
+                            val indexOf = tile.selected.indexOf(-1)
                             if (indexOf == -1) {
-                                selected[pointer] = index
-                                pointer = (pointer + 1) % selected.size
+                                setSelected(tile.pointer, index)
+                                tile.pointer = (tile.pointer + 1) % tile.selected.size
                             } else {
-                                selected[indexOf] = index
+                                setSelected(indexOf, index)
                             }
                         }
                     } else {
-                        val indexOf = selected.indexOf(index)
+                        val indexOf = tile.selected.indexOf(index)
                         if (indexOf != -1) {
-                            selected[indexOf] = -1
+                            setSelected(indexOf, -1)
+
                         }
                     }
                     break@start
@@ -205,6 +230,12 @@ class GuiController(val controller: ContainerController) : GuiBase(controller) {
             }
         }
         super.mouseClicked(mouseX, mouseY, mouseButton)
+    }
+
+    fun setSelected(index: Int, value: Int) {
+        controller.tileEntity!!.selected[index] = value
+        Statistics.NETWORK.sendToServer(ClientEventPacket(controller.tileEntity!!.world.provider.dimension,
+                controller.tileEntity!!.pos, index, value))
     }
 
     fun inside(x: Int, y: Int, sizeX: Int, sizeY: Int, mx: Int, my: Int): Boolean {
@@ -226,56 +257,26 @@ class ContainerController(world: World, pos: BlockPos, player: EntityPlayer) : C
     override fun readPacket(pkt: GuiPacket) {
         if (tileEntity != null) {
             synchronized(tileEntity as TileController) {
-                val nbt = pkt.nbt!!
+                val data = pkt.nbt!!
+                tileEntity!!.type = data.getInteger("Type")
 
-                if (nbt.hasKey("short")) {
-                    tileEntity!!.shortSnapshots.clear()
-                    val short = nbt.getTagList("short", Constants.NBT.TAG_LIST)
-                    for (i in 0 until short.tagCount()) {
-                        val shot = TileController.DataSnapshot()
-                        (short[i] as NBTTagList).forEach {
-                            val item = it.getShort("I").toInt()
-                            val meta = it.getShort("M").toInt()
-                            val tag = it.getCompoundTag("N")
-                            val size = it.getShort("S").toInt()
-                            val id = TileController.ItemIdentifier(ItemStack(Item.getItemById(item), 1, meta, tag))
-                            shot.data.put(id, TileController.ItemStatistics(id).apply { this.amount = size })
-                        }
-                        tileEntity!!.shortSnapshots.add(shot)
-                    }
+                val values = data.getCompoundTag("Data")
+
+                val items = mutableListOf<ItemIdentifier>()
+                values.getTagList("Items", Constants.NBT.TAG_COMPOUND)!!.forEach {
+                    items.add(ItemIdentifier.deserializeNBT(it))
                 }
+                tileEntity!!.items.addAll(items)
 
-                if (nbt.hasKey("medium")) {
-                    tileEntity!!.mediumSnapshots.clear()
-                    val medium = nbt.getTagList("medium", Constants.NBT.TAG_LIST)
-                    for (i in 0 until medium.tagCount()) {
-                        val shot = TileController.DataSnapshot()
-                        val data = mutableMapOf<TileController.ItemIdentifier, TileController.ItemStatistics>()
-                        (medium[i] as NBTTagList).forEach {
-                            val item = it.getInteger("I")
-                            val meta = it.getInteger("M")
-                            val tag = it.getCompoundTag("N")
-                            val size = it.getInteger("S")
-                            val id = TileController.ItemIdentifier(ItemStack(Item.getItemById(item), 1, meta, tag))
-                            shot.data.put(id, TileController.ItemStatistics(id).apply { this.amount = size })
-                        }
-                        tileEntity!!.mediumSnapshots.add(shot)
-                    }
+                val selected = mutableMapOf<Int, IntArray>()
+                values.getTagList("Selected", Constants.NBT.TAG_COMPOUND)!!.forEach {
+                    val index = it.getByte("Index").toInt()
+                    val stats = it.getIntArray("Stats")
+                    selected.put(index, stats)
                 }
-
-                if (nbt.hasKey("large")) {
-                    tileEntity!!.largeSnapshots.clear()
-                    val large = nbt.getTagList("large", Constants.NBT.TAG_LIST)
-                    for (i in 0 until large.tagCount()) {
-                        val shot = TileController.DataSnapshot()
-                        val data = mutableMapOf<TileController.ItemIdentifier, TileController.ItemStatistics>()
-                        (large[i] as NBTTagList).forEach {
-                            val item = ItemStack.loadItemStackFromNBT(it.getCompoundTag("Item"))
-                            val id = TileController.ItemIdentifier(item)
-                            shot.data.put(id, TileController.ItemStatistics(id).apply { amount = nbt.getInteger("stacksize") })
-                        }
-                        tileEntity!!.largeSnapshots.add(shot)
-                    }
+                tileEntity!!.dataArray.clear()
+                for ((key, value) in selected) {
+                    tileEntity!!.dataArray.put(key, value.asList().toMutableList())
                 }
             }
         }
@@ -284,52 +285,52 @@ class ContainerController(world: World, pos: BlockPos, player: EntityPlayer) : C
     override fun writePacket(): GuiPacket {
         val data = NBTTagCompound()
         if (tileEntity != null) {
-            val short = NBTTagList()
-            val medium = NBTTagList()
-            val large = NBTTagList()
-
-            for (shot in tileEntity!!.shortSnapshots) {
-                val list = NBTTagList()
-                for ((key, value) in shot.data) {
-                    val nbt = NBTTagCompound()
-                    nbt.setShort("I", Item.getIdFromItem(key.stack.item).toShort())
-                    nbt.setShort("M", key.stack.metadata.toShort())
-                    key.stack.tagCompound?.let { nbt.setTag("N", it) }
-                    nbt.setShort("S", value.amount.toShort())
-                    list.appendTag(nbt)
-                }
-                short.appendTag(list)
+            data.setInteger("Type", tileEntity!!.type)
+            if (tileEntity!!.type == 0) {
+                val short = NBTTagCompound()
+                short.setTag("Items", encodeItems(tileEntity!!.shortUpdates))
+                short.setTag("Selected", encodeSelected(tileEntity!!.shortUpdates))
+                data.setTag("Data", short)
             }
-
-            for (shot in tileEntity!!.mediumSnapshots) {
-                val list = NBTTagList()
-                for ((key, value) in shot.data) {
-                    val nbt = NBTTagCompound()
-                    nbt.setTag("Item", key.stack.serializeNBT())
-                    nbt.setInteger("stacksize", value.amount)
-                    list.appendTag(nbt)
-                }
-                medium.appendTag(list)
+            if (tileEntity!!.type == 1) {
+                val medium = NBTTagCompound()
+                medium.setTag("Items", encodeItems(tileEntity!!.mediumUpdates))
+                medium.setTag("Selected", encodeSelected(tileEntity!!.mediumUpdates))
+                data.setTag("Data", medium)
             }
-
-            for (shot in tileEntity!!.largeSnapshots) {
-                val list = NBTTagList()
-                for ((key, value) in shot.data) {
-                    val nbt = NBTTagCompound()
-                    nbt.setTag("Item", key.stack.serializeNBT())
-                    nbt.setInteger("stacksize", value.amount)
-                    list.appendTag(nbt)
-                }
-                large.appendTag(list)
+            if (tileEntity!!.type == 2) {
+                val large = NBTTagCompound()
+                large.setTag("Items", encodeItems(tileEntity!!.largeUpdates))
+                large.setTag("Selected", encodeSelected(tileEntity!!.largeUpdates))
+                data.setTag("Data", large)
             }
-
-            data.setTag("short", short)
-//            data.setTag("medium", medium)
-//            data.setTag("large", large)
         }
         return GuiPacket(data)
     }
 
+    private fun encodeItems(map: Map<ItemIdentifier, ItemStatistics>): NBTTagList {
+        //items
+        val itemList = NBTTagList()
+        for (i in map.keys) {
+            itemList.appendTag(i.serializeNBT())
+        }
+        return itemList
+    }
+
+    private fun encodeSelected(map: Map<ItemIdentifier, ItemStatistics>): NBTTagList {
+        val nbt = NBTTagList()
+        var index = 0
+        for ((key, value) in map.entries.sortedBy { it.key.stack.item.registryName.toString() }) {
+            if (index in tileEntity!!.selected) {
+                val tag = NBTTagCompound()
+                tag.setByte("Index", index.toByte())
+                tag.setIntArray("Stats", value.stackSize.toIntArray())
+                nbt.appendTag(tag)
+            }
+            index++
+        }
+        return nbt
+    }
 }
 
 fun NBTTagList.forEach(action: (NBTTagCompound) -> Unit) {

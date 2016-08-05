@@ -1,6 +1,7 @@
 package com.cout970.statistics
 
 import com.cout970.statistics.gui.GuiHandler
+import com.cout970.statistics.network.ClientEventPacket
 import com.cout970.statistics.network.GuiPacket
 import com.cout970.statistics.registry.registerBlocks
 import com.cout970.statistics.registry.registerTileEntities
@@ -20,5 +21,6 @@ open class CommonLoader {
     open fun init(){
         NetworkRegistry.INSTANCE.registerGuiHandler(Statistics, GuiHandler)
         Statistics.NETWORK.registerMessage(GuiPacket.Companion, GuiPacket::class.java, 0, Side.CLIENT)
+        Statistics.NETWORK.registerMessage(ClientEventPacket.Companion, ClientEventPacket::class.java, 1, Side.SERVER)
     }
 }

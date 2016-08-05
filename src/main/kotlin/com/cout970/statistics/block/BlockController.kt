@@ -7,6 +7,7 @@ import net.minecraft.block.material.Material
 import net.minecraft.block.properties.PropertyDirection
 import net.minecraft.block.state.BlockStateContainer
 import net.minecraft.block.state.IBlockState
+import net.minecraft.entity.EntityLivingBase
 import net.minecraft.entity.player.EntityPlayer
 import net.minecraft.item.ItemStack
 import net.minecraft.tileentity.TileEntity
@@ -24,6 +25,11 @@ val propertyDirection: PropertyDirection = PropertyDirection.create("facing", li
 object BlockController : BlockBase(Material.IRON, "controller"), ITileEntityProvider {
 
     override fun createNewTileEntity(worldIn: World?, meta: Int): TileEntity = TileController()
+
+    override fun onBlockPlacedBy(worldIn: World, pos: BlockPos, state: IBlockState, placer: EntityLivingBase, stack: ItemStack?) {
+        super.onBlockPlacedBy(worldIn, pos, state, placer, stack)
+        worldIn.setBlockState(pos, state.withProperty(propertyDirection, placer.horizontalFacing.opposite))
+    }
 
     override fun createBlockState(): BlockStateContainer = BlockStateContainer(this, propertyDirection)
 
