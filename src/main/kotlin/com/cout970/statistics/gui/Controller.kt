@@ -237,10 +237,6 @@ class GuiController(val controller: ContainerController) : GuiBase(controller) {
         Statistics.NETWORK.sendToServer(ClientEventPacket(controller.tileEntity!!.world.provider.dimension,
                 controller.tileEntity!!.pos, index, value))
     }
-
-    fun inside(x: Int, y: Int, sizeX: Int, sizeY: Int, mx: Int, my: Int): Boolean {
-        return mx >= x && mx <= x + sizeX && my >= y && my <= y + sizeY
-    }
 }
 
 class ContainerController(world: World, pos: BlockPos, player: EntityPlayer) : ContainerBase(world, pos, player) {

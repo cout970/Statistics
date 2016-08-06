@@ -1,0 +1,17 @@
+{
+    "forge_marker": 1,
+    "defaults": {
+        "model": "cube_all",
+        "textures": {
+            "all": "statistics:block/inventory_detector"
+        }
+    },
+    "variants": {
+        "normal": [{ }],
+        "inventory": [
+            {
+                "transform": "forge:default-block"
+            }
+        ]
+    }
+}

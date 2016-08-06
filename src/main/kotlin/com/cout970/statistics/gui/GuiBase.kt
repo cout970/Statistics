@@ -42,4 +42,8 @@ abstract class GuiBase(val container: ContainerBase) : GuiContainer(container) {
         GlStateManager.disableBlend()
         GlStateManager.color(1.0f, 1.0f, 1.0f, 1.0f)
     }
+
+    fun inside(x: Int, y: Int, sizeX: Int, sizeY: Int, mx: Int, my: Int): Boolean {
+        return mx >= x && mx <= x + sizeX && my >= y && my <= y + sizeY
+    }
 }

@@ -13,6 +13,8 @@ object GuiHandler : IGuiHandler {
     override fun getClientGuiElement(ID: Int, player: EntityPlayer, world: World, x: Int, y: Int, z: Int): Any? {
         if (ID == 0) {
             return GuiController(getServerGuiElement(ID, player, world, x, y, z) as ContainerController)
+        } else if (ID == 1) {
+            return GuiInventoryDetector(getServerGuiElement(ID, player, world, x, y, z) as ContainerInventoryDetector)
         }
         return null
     }
@@ -20,6 +22,8 @@ object GuiHandler : IGuiHandler {
     override fun getServerGuiElement(ID: Int, player: EntityPlayer, world: World, x: Int, y: Int, z: Int): Any? {
         if (ID == 0) {
             return ContainerController(world, BlockPos(x, y, z), player)
+        } else if (ID == 1) {
+            return ContainerInventoryDetector(world, BlockPos(x, y, z), player)
         }
         return null
     }

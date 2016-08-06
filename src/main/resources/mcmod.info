@@ -1,16 +1,16 @@
 [
 {
-  "modid": "examplemod",
-  "name": "Example Mod",
-  "description": "Example placeholder mod.",
-  "version": "${version}",
-  "mcversion": "${mcversion}",
+  "modid": "statistics",
+  "name": "Statistics",
+  "description": "A mod for Modding trials, adding statistics for inventories",
+  "version": "@VERSION@",
+  "mcversion": "1.10.2",
   "url": "",
   "updateUrl": "",
-  "authorList": ["ExampleDude"],
-  "credits": "The Forge and FML guys, for making this example",
+  "authorList": ["cout970"],
+  "credits": "Thanks to all that have helped me doing this, wait, no one help me with this",
   "logoFile": "",
   "screenshots": [],
-  "dependencies": []
+  "dependencies": ["zml"]
 }
 ]

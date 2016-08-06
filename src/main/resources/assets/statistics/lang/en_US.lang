@@ -1,3 +1,4 @@
 tile.statistics:cable.name=Logistic Cable
 tile.statistics:controller.name=Logistic Controller
 tile.statistics:inventory_connector.name=Inventory Connector
+tile.statistics:inventory_detector.name=Inventory Detector
