@@ -18,7 +18,10 @@ buildscript {
 apply plugin: 'net.minecraftforge.gradle.forge'
 apply plugin: 'kotlin'
 
-version = "1.0.0"
+sourceCompatibility = "1.8"
+targetCompatibility = "1.8"
+
+version = "1.0.1"
 group = "com.cout970.statistics"
 archivesBaseName = "statistics"
 
@@ -29,10 +32,12 @@ minecraft {
     replace "@VERSION@", project.version
 
     mappings = "snapshot_20160518"
+    makeObfSourceJar = false
 }
 
 dependencies {
-    files("./lib/ModelMaker-r1.3.jar")
+    compile files("./lib/ModelMaker-r1.3.jar")
+    compile "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
 }
 
 processResources

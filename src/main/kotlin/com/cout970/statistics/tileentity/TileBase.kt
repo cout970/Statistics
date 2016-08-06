@@ -19,7 +19,7 @@ abstract class TileBase : TileEntity() {
 
     fun getStacks(): List<ItemStack> {
         val invs = getInventories()
-        val items = mutableListOf<ItemStack>()
+        val items = mutableSetOf<ItemStack>()
         for (i in invs) {
             for (j in 0 until i.slots) {
                 val item = i.getStackInSlot(j)
@@ -28,7 +28,7 @@ abstract class TileBase : TileEntity() {
                 }
             }
         }
-        return items
+        return items.toList()
     }
 
     open fun getInventories(): List<IItemHandler> {

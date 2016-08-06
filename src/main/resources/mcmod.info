@@ -11,6 +11,6 @@
   "credits": "Thanks to all that have helped me doing this, wait, no one help me with this",
   "logoFile": "",
   "screenshots": [],
-  "dependencies": ["zml"]
+  "dependencies": ["Zen Model Loader", "kotlin"]
 }
 ]
